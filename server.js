@@ -94,6 +94,9 @@ app.post('/grafana', express.json(), async (req, res) => {
     }
 });
 
+// 健康檢查 Endpoint
+app.get('/health', (req, res) => res.status(200).send('OK'));
+
 app.listen(PORT, () => {
     console.log(`🚀 Proxy running on port ${PORT}`);
 });
