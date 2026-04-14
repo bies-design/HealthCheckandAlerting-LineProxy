@@ -17,7 +17,6 @@ services:
       # 請替換為你的 LINE Bot Channel 安全驗證碼
       # - LINE_CHANNEL_SECRET=your_channel_secret
     volumes:
-      - /data/coolify/configurations/line/proxy/.env_build:/app/.env_build:ro
       - /data/coolify/configurations/line/proxy/.env_start:/app/.env:ro
     healthcheck:
       test:
