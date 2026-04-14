@@ -1,5 +1,6 @@
 const express = require('express');
 const line = require('@line/bot-sdk');
+require('dotenv').config();
 
 // 建立一個小工具函數：專門用來脫掉環境變數頭尾的引號與空白
 function cleanEnv(value) {
