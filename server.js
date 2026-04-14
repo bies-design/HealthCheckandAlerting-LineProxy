@@ -1,10 +1,17 @@
 const express = require('express');
 const line = require('@line/bot-sdk');
 
-// 初始化設定 (對應你的 Python Configuration)
+// 建立一個小工具函數：專門用來脫掉環境變數頭尾的引號與空白
+function cleanEnv(value) {
+    if (!value) return undefined;
+    // 移除頭尾可能出現的單引號、雙引號，以及多餘的空白字元
+    return value.replace(/^["']|["']$/g, '').trim();
+}
+
+// 初始化設定 (加入自動清理機制)
 const config = {
-    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-    channelSecret: process.env.LINE_CHANNEL_SECRET
+    channelAccessToken: cleanEnv(process.env.LINE_CHANNEL_ACCESS_TOKEN),
+    channelSecret: cleanEnv(process.env.LINE_CHANNEL_SECRET)
 };
 
 // 建立 Messaging API 客戶端

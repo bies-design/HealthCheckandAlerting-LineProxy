@@ -46,9 +46,7 @@ LINE_TARGET_ID=your_user_or_group_id_here
   --name grafana-line-proxy \
   -p 3000:3000 \
   --network monitor \
-  -e PORT=3000 \
-  -e LINE_CHANNEL_ACCESS_TOKEN="你的_Channel_Access_Token" \
-  -e LINE_CHANNEL_SECRET="你的_Channel_Secret" \
+  --env-file ./.env \
   --restart unless-stopped \
   grafana-line-proxy
 ```

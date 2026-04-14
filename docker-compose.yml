@@ -8,12 +8,17 @@ services:
       - "9080:3000" # 對外開放 9080 port，Grafana Webhook 請填入此 port
     networks:
       - monitor
+    env_file:
+      - .env
     # environment:
       # - PORT=3000
       # 請替換為你的 LINE Bot Channel Access Token
       # - LINE_ACCESS_TOKEN=your_channel_access_token
       # 請替換為你的 LINE Bot Channel 安全驗證碼
       # - LINE_CHANNEL_SECRET=your_channel_secret
+    volumes:
+      - /data/coolify/configurations/line/proxy/.env_build:/app/.env_build:ro
+      - /data/coolify/configurations/line/proxy/.env_start:/app/.env:ro
     healthcheck:
       test:
         - CMD-SHELL
