@@ -61,7 +61,7 @@ async function handleLineEvent(event) {
 app.post('/grafana', express.json(), async (req, res) => {
     try {
         // 【核心改變】從 URL Query 動態取得 User ID (對於Line Bot 而言隸屬的使用者身分ID)
-        // 例如: http://localhost:3000/grafana?to=C1234567890abcdef...
+        // 例如: http://localhost:3000/grafana?to=U1234567890abcdef...
         const lineBotAuthUserId = req.query.to; 
         
         if (!lineBotAuthUserId) {
