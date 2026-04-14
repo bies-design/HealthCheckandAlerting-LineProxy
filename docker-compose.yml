@@ -14,6 +14,14 @@ services:
       # - LINE_ACCESS_TOKEN=your_channel_access_token
       # 請替換為你的 LINE Bot Channel 安全驗證碼
       # - LINE_CHANNEL_SECRET=your_channel_secret
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget -q --spider http://localhost:3000/health || exit 1'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
 networks:
   monitor:
