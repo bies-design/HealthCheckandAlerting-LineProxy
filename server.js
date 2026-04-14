@@ -60,11 +60,11 @@ async function handleLineEvent(event) {
 // 注意：這裡不能用 line.middleware，因為這是 Grafana 打來的，沒有 LINE 的簽章
 app.post('/grafana', express.json(), async (req, res) => {
     try {
-        // 【核心改變】從 URL Query 動態取得 Target ID
+        // 【核心改變】從 URL Query 動態取得 User ID (對於Line Bot 而言隸屬的使用者身分ID)
         // 例如: http://localhost:3000/grafana?to=C1234567890abcdef...
-        const targetId = req.query.to; 
+        const lineBotAuthUserId = req.query.to; 
         
-        if (!targetId) {
+        if (!lineBotAuthUserId) {
             return res.status(400).send("Missing 'to' query parameter. Example: /grafana?to=YOUR_ID");
         }
 
@@ -83,7 +83,7 @@ app.post('/grafana', express.json(), async (req, res) => {
 
         // 使用 Push API 發送給動態指定的 ID
         await client.pushMessage({
-            to: targetId,
+            to: lineBotAuthUserId,
             messages: [{ type: 'text', text: alertMessage.trim().substring(0, 4900) }]
         });
 
