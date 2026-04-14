@@ -105,5 +105,7 @@ app.post('/grafana', express.json(), async (req, res) => {
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
 app.listen(PORT, () => {
+    console.log(`🚨 channel Access Token ${config.channelAccessToken}`);
+    console.log(`💡 channel Secret ${config.channelSecret}`);
     console.log(`🚀 Proxy running on port ${PORT}`);
 });
