@@ -8,12 +8,12 @@ services:
       - "9080:3000" # 對外開放 9080 port，Grafana Webhook 請填入此 port
     networks:
       - monitor
-    environment:
-      - PORT=3000
+    # environment:
+      # - PORT=3000
       # 請替換為你的 LINE Bot Channel Access Token
-      - LINE_ACCESS_TOKEN=9YYvKz4ezNSgOFFjGAWGJzUZMXGcI0X8JKqTJSdr1ybkQW6S1kmv2iK0Xj2nMb+E58bHsoAVigRC3T4qDf6z/HJsTNT3vmLoqEI5vlbK9wKakAW8AuEHs2ikaprj7pM7uE54jW9wPIpBXXO/vcqXxAdB04t89/1O/w1cDnyilFU=
+      # - LINE_ACCESS_TOKEN=your_channel_access_token
       # 請替換為你的 LINE Bot Channel 安全驗證碼
-      - LINE_CHANNEL_SECRET=your_channel_secret
+      # - LINE_CHANNEL_SECRET=your_channel_secret
     restart: unless-stopped
 networks:
   monitor:
