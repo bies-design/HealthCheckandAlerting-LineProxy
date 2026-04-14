@@ -77,15 +77,21 @@ app.post('/grafana', express.json(), async (req, res) => {
         }
 
         const payload = req.body;
+
+        const customTitle = payload.commonAnnotations?.summary || "Grafana Alert";
+        const customMessage = payload.commonAnnotations?.description || "";
+
         const statusIcon = payload.status === 'firing' ? '🚨' : '✅';
         const statusText = payload.status ? payload.status.toUpperCase() : 'UNKNOWN';
         
-        let alertMessage = `${statusIcon} [${statusText}] ${payload.title || 'Grafana Alert'}\n`;
+        let alertMessage = `${statusIcon} [${statusText}] Grafana Alert\n`;
+        alertMessage = `${customTitle}\n`;
+        alertMessage += `----------------------------\n`;
+        alertMessage += `${customMessage}\n`;
 
-        if (payload.alerts && payload.alerts.length > 0) {
+        if (payload.alerts && payload.alerts.length > 0 && !customMessage) {
             payload.alerts.forEach((alert, index) => {
                 alertMessage += `\n🔹 告警 ${index + 1}: ${alert.labels?.alertname || 'Unnamed'}`;
-                if (alert.annotations?.summary) alertMessage += `\n摘要: ${alert.annotations.summary}`;
             });
         }
 
