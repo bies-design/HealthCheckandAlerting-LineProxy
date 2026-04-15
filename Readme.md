@@ -2,7 +2,8 @@
 
 made by: Gemini.Pro <br/>
 owner: mark.hsieh <br/>
-last update: 2026/04/14 pm 04:10 CST
+last update: 2026/04/15 pm 04:10 CST
+version: v1.1.0
 
 ## How to use
 

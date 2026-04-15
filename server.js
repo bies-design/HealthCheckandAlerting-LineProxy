@@ -1,6 +1,9 @@
 const express = require('express');
 const line = require('@line/bot-sdk');
 require('dotenv').config();
+// --------------------
+const { verifySignature } = require('#api/verifySignature');
+const { grafana2LineMsgConverter } = require('#api/grafana2LineMsgConverter');
 
 // 建立一個小工具函數：專門用來脫掉環境變數頭尾的引號與空白
 function cleanEnv(value) {
@@ -24,17 +27,51 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ────────────────────────────────────────
-// 1. 處理來自 LINE 的 Webhook (對應你的 Python 範例)
+// 1. 處理來自 LINE 的 Webhook 
 // line.middleware 會自動處理 X-Line-Signature 加密驗證！
 // ────────────────────────────────────────
-app.post('/line', line.middleware(config), (req, res) => {
-    Promise
-        .all(req.body.events.map(handleLineEvent))
-        .then((result) => res.json(result))
-        .catch((err) => {
-            console.error('LINE Webhook Error:', err);
-            res.status(500).end();
-        });
+// app.post('/line', line.middleware(config), (req, res) => {
+//     Promise
+//         .all(req.body.events.map(handleLineEvent))
+//         .then((result) => res.json(result))
+//         .catch((err) => {
+//             console.error('LINE Webhook Error:', err);
+//             res.status(500).end();
+//         });
+// });
+// ------------------------------------------
+// 改成手動驗證，這樣就能同時處理來自 LINE 和 Grafana 的請求了
+// ------------------------------------------
+// 注意：不要在全域對 /line 使用 express.json()，
+// 我們在路由內部手動獲取原始資料 (Raw Body)
+// Webhook Router
+app.post('/line', express.raw({ type: 'application/json' }), async (req, res) => {
+    const signature = req.headers['x-line-signature'];
+    const body = req.body.toString(); // 這是原始字串，驗證簽章必須用它
+
+    // 1. 手動驗證簽章 (取代 line.middleware)
+    if (!verifySignature(config.channelSecret, signature, body)) {
+        console.error('⚠️ [LINE] 簽章驗證失敗！');
+        return res.status(401).send('Invalid Signature');
+    }
+
+    // 2. 驗證成功後，手動轉成 JSON
+    const data = JSON.parse(body);
+    
+    // 3. 處理事件 (原本的邏輯)
+    try {
+        if (!data.events || data.events.length === 0) {
+            // LINE Verify 測試會發送空事件，直接回傳 OK
+            console.log('✅ [LINE] 收到 Verify 測試訊號');
+            return res.sendStatus(200);
+        }
+
+        const result = await Promise.all(data.events.map(handleLineEvent));
+        res.json(result);
+    } catch (err) {
+        console.error('🚨[LINE] 處理事件出錯:', err);
+        res.status(500).end();
+    }
 });
 
 async function handleLineEvent(event) {
@@ -63,8 +100,8 @@ async function handleLineEvent(event) {
     }
     else {
         // 其他事件類型可以在這裡處理，或直接忽略
-        console.log('Received unsupported event type:', event.type);
-        console.log('Event details:', JSON.stringify(event, null, 2));  
+        console.log('🛠️ [LINE] Received unsupported event type:', event.type);
+        console.log('🛠️ [LINE] Event details:', JSON.stringify(event, null, 2));  
     }
 
     return Promise.resolve(null);
@@ -84,24 +121,8 @@ app.post('/grafana', express.json(), async (req, res) => {
             return res.status(400).send("Missing 'to' query parameter. Example: /grafana?to=YOUR_ID");
         }
 
-        const payload = req.body;
-
-        const customTitle = payload.commonAnnotations?.summary || "Grafana Alert";
-        const customMessage = payload.commonAnnotations?.description || "";
-
-        const statusIcon = payload.status === 'firing' ? '🚨' : '✅';
-        const statusText = payload.status ? payload.status.toUpperCase() : 'UNKNOWN';
-        
-        let alertMessage = `${statusIcon} [${statusText}] Grafana Alert\n`;
-        alertMessage = `${customTitle}\n`;
-        alertMessage += `----------------------------\n`;
-        alertMessage += `${customMessage}\n`;
-
-        if (payload.alerts && payload.alerts.length > 0 && !customMessage) {
-            payload.alerts.forEach((alert, index) => {
-                alertMessage += `\n🔹 告警 ${index + 1}: ${alert.labels?.alertname || 'Unnamed'}`;
-            });
-        }
+        // 1. 轉換 Grafana 的 Payload 成 LINE 訊息格式
+        const alertMessage = await grafana2LineMsgConverter(req.body);
 
         // 使用 Push API 發送給動態指定的 ID
         await client.pushMessage({
@@ -111,7 +132,7 @@ app.post('/grafana', express.json(), async (req, res) => {
 
         res.status(200).send('Alert forwarded to LINE successfully.');
     } catch (error) {
-        console.error('Grafana Forwarding Error:', error.message);
+        console.error('🚨 [LINE] Grafana Forwarding Error:', error.message);
         res.status(200).send('Received, but failed to send to LINE.');
     }
 });
