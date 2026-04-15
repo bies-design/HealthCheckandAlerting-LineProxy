@@ -15,7 +15,8 @@ function cleanEnv(value) {
 // 初始化設定 (加入自動清理機制)
 const config = {
     channelAccessToken: cleanEnv(process.env.LINE_CHANNEL_ACCESS_TOKEN),
-    channelSecret: cleanEnv(process.env.LINE_CHANNEL_SECRET)
+    channelSecret: cleanEnv(process.env.LINE_CHANNEL_SECRET),
+    logRateLimit: cleanEnv(process.env.LOG_RATE_LIMIT_MS) || "43200000" // 預設 12 小時
 };
 
 // 建立 Messaging API 客戶端
@@ -25,6 +26,41 @@ const client = new line.messagingApi.MessagingApiClient({
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// 管理單純紀錄Log 的低威脅度資訊，不觸發警報
+// 但是被限制同來源只能在長時間內只能記錄一次
+let lastCalling = {
+    "cpu": null,
+    "mem": null,
+    "disk": null,
+    "network": null,
+    "other": null
+};
+
+async function elementMappingNorm(source) {
+    let lowcaseSource = source.toLowerCase();
+    let normSource = lowcaseSource;
+    switch (lowcaseSource) {
+        case 'cpu':
+        case 'mem':
+        case 'disk':
+        case 'network':
+        case 'other':
+            break;
+        default:
+            normSource = 'other';
+    }
+    return normSource;
+}
+async function getLastCallingTime(source) {
+    let normSource = await elementMappingNorm(source);
+    return lastCalling[normSource];
+}
+async function updateLastCalling(source) {
+    const currentTime = new Date(); 
+    let normSource = await elementMappingNorm(source);
+    lastCalling[normSource] = currentTime;
+}
 
 // ────────────────────────────────────────
 // 1. 處理來自 LINE 的 Webhook 
@@ -40,7 +76,7 @@ const PORT = process.env.PORT || 3000;
 //         });
 // });
 // ------------------------------------------
-// 改成手動驗證，這樣就能同時處理來自 LINE 和 Grafana 的請求了
+// 改成手動驗證，這樣就能檢查 LINE 的簽章驗證過程
 // ------------------------------------------
 // 注意：不要在全域對 /line 使用 express.json()，
 // 我們在路由內部手動獲取原始資料 (Raw Body)
@@ -137,11 +173,48 @@ app.post('/grafana', express.json(), async (req, res) => {
     }
 });
 
+// ────────────────────────────────────────
+// 2. 處理來自 Grafana 的 Webhook (主動推播 Push API)
+// ────────────────────────────────────────
+// 純粹用來記錄 Grafana 發過來的資料，並且回傳 200 給 Grafana，讓它知道我們收到了
+app.post('/logs', express.json(), async (req, res) => {
+    try {
+        const lineBotAuthUserId = req.query.to; 
+        if (!lineBotAuthUserId) {
+            return res.status(400).send("Missing 'to' query parameter. Example: /grafana?to=YOUR_ID");
+        }
+
+        const whosCalling = req.query.from || 'unknown';
+        const currentTime = new Date();
+        const lastTime = await getLastCallingTime(whosCalling);
+        const logRateLimitNum = parseInt(config.logRateLimit);
+        if (lastTime && (currentTime - lastTime < logRateLimitNum)) {
+            // console.log(`⏳ [${whosCalling}] Log rate limited. Skipping log entry.`);
+            return res.status(200).send('Log received but rate limited.');
+        }
+        else {
+            await updateLastCalling(whosCalling);
+        }
+
+        // 1. 轉換 Grafana 的 Payload 成 LINE 訊息格式
+        const alertMessage = await grafana2LineMsgConverter(req.body);
+
+        // 留下Log紀錄 Grafana 發過來的資料，此處是過半量使用的紀錄，輕度提醒紀錄而已
+        console.log('📢 [Grafana:logs] Received Alert:\n', JSON.stringify(req.body, null, 2));
+        console.log('📢 [Grafana:logs] Converted LINE Message:\n', alertMessage);
+
+        res.status(200).send('Alert forwarded to LINE successfully.');
+    } catch (error) {
+        console.error('🚨 [Grafana:logs] Grafana Forwarding Error:', error.message);
+        res.status(200).send('Received, but failed to send to LINE.');
+    }
+});
+
 // 健康檢查 Endpoint
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
 app.listen(PORT, () => {
-    console.log(`🚨 channel Access Token ${config.channelAccessToken}`);
-    console.log(`💡 channel Secret ${config.channelSecret}`);
-    console.log(`🚀 Proxy running on port ${PORT}`);
+    console.log(`🚨 [G2L-MsgConvert] channel Access Token ${config.channelAccessToken}`);
+    console.log(`💡 [G2L-MsgConvert] channel Secret ${config.channelSecret}`);
+    console.log(`🚀 [G2L-MsgConvert] Proxy running on port ${PORT}`);
 });
