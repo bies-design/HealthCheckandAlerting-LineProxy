@@ -40,14 +40,16 @@ app.post('/line', line.middleware(config), (req, res) => {
 async function handleLineEvent(event) {
     // 處理加入好友/群組事件
     if (event.type === 'follow' || event.type === 'join') {
+        // 動態判斷來源是群組還是個人
+        const sourceId = event.source.groupId || event.source.roomId || event.source.userId;
+
         return client.replyMessage({
             replyToken: event.replyToken,
-            messages: [{ type: 'text', text: '感謝加入！請使用本群組的 ID 來設定 Grafana 告警。' }]
+            messages: [{ type: 'text', text: `感謝加入！請使用本群組的 ID :${sourceId} \n來設定 Grafana 告警。` }]
         });
     }
-
     // 處理文字訊息 (Echo Bot)，順便印出動態 ID 讓你知道要填什麼給 Grafana
-    if (event.type === 'message' && event.message.type === 'text') {
+    else if (event.type === 'message' && event.message.type === 'text') {
         // 動態判斷來源是群組還是個人
         const sourceId = event.source.groupId || event.source.roomId || event.source.userId;
         
@@ -59,6 +61,12 @@ async function handleLineEvent(event) {
             }]
         });
     }
+    else {
+        // 其他事件類型可以在這裡處理，或直接忽略
+        console.log('Received unsupported event type:', event.type);
+        console.log('Event details:', JSON.stringify(event, null, 2));  
+    }
+
     return Promise.resolve(null);
 }
 
