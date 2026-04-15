@@ -4,6 +4,7 @@ require('dotenv').config();
 // --------------------
 const { verifySignature } = require('#api/verifySignature');
 const { grafana2LineMsgConverter } = require('#api/grafana2LineMsgConverter');
+const { lineReplyDesign } = require('#api/lineReplyDesign');
 
 // 建立一個小工具函數：專門用來脫掉環境變數頭尾的引號與空白
 function cleanEnv(value) {
@@ -16,7 +17,8 @@ function cleanEnv(value) {
 const config = {
     channelAccessToken: cleanEnv(process.env.LINE_CHANNEL_ACCESS_TOKEN),
     channelSecret: cleanEnv(process.env.LINE_CHANNEL_SECRET),
-    logRateLimit: cleanEnv(process.env.LOG_RATE_LIMIT_MS) || "43200000" // 預設 12 小時
+    logRateLimit: cleanEnv(process.env.LOG_RATE_LIMIT_MS) || "43200000", // 預設 12 小時
+    promethusApiUrl: cleanEnv(process.env.PROMETHEUS_API_URL) || "http://localhost:9090/api/v1/query"
 };
 
 // 建立 Messaging API 客戶端
@@ -123,14 +125,14 @@ async function handleLineEvent(event) {
     }
     // 處理文字訊息 (Echo Bot)，順便印出動態 ID 讓你知道要填什麼給 Grafana
     else if (event.type === 'message' && event.message.type === 'text') {
-        // 動態判斷來源是群組還是個人
-        const sourceId = event.source.groupId || event.source.roomId || event.source.userId;
+
+        const alertData = await lineReplyDesign(event.source, event.message, config.promethusApiUrl);
         
         return client.replyMessage({
             replyToken: event.replyToken,
             messages: [{ 
-                type: 'text', 
-                text: `你說了：${event.message.text}\n\n💡 這個聊天室的動態 ID 是：\n${sourceId}` 
+                type: alertData.type || 'text', 
+                text: alertData.text || `收到你的訊息了！ ${event.message.text}`
             }]
         });
     }

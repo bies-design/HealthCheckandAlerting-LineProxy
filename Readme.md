@@ -17,6 +17,7 @@ LINE_ACCESS_TOKEN=your_channel_access_token_here
 LINE_TARGET_ID=your_user_or_group_id_here
 # 預設低威脅度的警報只會紀錄Log, 同樣的來源的允許紀錄間隔時間
 LOG_RATE_LIMIT_MS=43200000
+PROMETHEUS_API_URL=http://localhost:9090/api/v1/query
 ```
 
 2. docker compose way <br/>
