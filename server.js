@@ -56,7 +56,8 @@ async function elementMappingNorm(source) {
 }
 async function getLastCallingTime(source) {
     let normSource = await elementMappingNorm(source);
-    return lastCalling[normSource];
+    // 如果沒有紀錄過，回傳 0，代表從未被呼叫過，避免虛值（Falsy values）誤判
+    return lastCalling[normSource] ?? 0; 
 }
 async function updateLastCalling(source) {
     const currentTime = new Date(); 
@@ -105,7 +106,20 @@ app.post('/line', express.raw({ type: 'application/json' }), async (req, res) =>
         }
 
         const result = await Promise.all(data.events.map(handleLineEvent));
-        res.json(result);
+
+        if (result.every(r => r === null)) {
+            // 如果所有事件都沒有回覆訊息，直接回傳 200 OK，不需要回傳空陣列
+            return res.sendStatus(200);
+        }
+        else if (result.replyToken === null) {
+            // 如果有任何事件被拒絕處理，回傳 200 OK 給 LINE 主機，但不回覆給使用者
+            console.warn('⚠️ [LINE] 有事件被拒絕處理，已記錄但不回覆給使用者');
+            console.log('🛠️ [LINE] 被拒絕的事件細節:', JSON.stringify(result.messages[0], null, 2));
+            return res.sendStatus(200);
+        }
+        else {
+            res.json(result);
+        }
     } catch (err) {
         console.error('🚨[LINE] 處理事件出錯:', err);
         res.status(500).end();
@@ -127,14 +141,30 @@ async function handleLineEvent(event) {
     else if (event.type === 'message' && event.message.type === 'text') {
 
         const alertData = await lineReplyDesign(event.source, event.message, config.promethusApiUrl);
-        
-        return client.replyMessage({
-            replyToken: event.replyToken,
-            messages: [{ 
-                type: alertData.type || 'text', 
-                text: alertData.text || `收到你的訊息了！ ${event.message.text}`
-            }]
-        });
+        if (alertData.type === 'text') {
+            return client.replyMessage({
+                replyToken: event.replyToken,
+                messages: [{ 
+                    type: alertData.type || 'text', 
+                    text: alertData.text || `收到你的訊息了！ ${event.message.text}`
+                }]
+            });
+        }
+        else if (alertData.type === 'deny') {
+            // 如果訊息被拒絕處理，回覆拒絕的訊息給使用者
+            // 為了節省回復次數，只回復收到請求的訊息給Line 主機，
+            // 不回復給使用者，讓使用者自己看 Log 就好
+            return client.replyMessage({
+                replyToken: null, // 不回復給使用者
+                messages: [{ type: 'text', text: alertData.text }]
+            });
+        } 
+        else {
+            // 其他類型的回覆可以在這裡處理，或直接忽略
+            console.log('🛠️ [LINE] Received unsupported command:', event.message.text);
+            console.log('🛠️ [LINE] Message details:', JSON.stringify(event.message, null, 2));  
+            // return Promise.resolve(null); // 不回復任何訊息
+        }
     }
     else {
         // 其他事件類型可以在這裡處理，或直接忽略
