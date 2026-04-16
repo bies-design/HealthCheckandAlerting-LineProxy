@@ -80,8 +80,8 @@ async function lineReplyDesign(source, message, targetUrl) {
                 const val = resp.data.data.result[0]?.value[1] || 0;
                 values[key] = parseFloat(val).toFixed(2);
             }));
-            values[FollowUpCount] = 0; // 重置追蹤次數
             deviceStatus = values; // 更新全局狀態
+            deviceStatus.FollowUpCount = 0; // 初始化追蹤次數
         }
 
         await updateLastCalling("status");
