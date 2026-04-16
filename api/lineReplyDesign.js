@@ -111,14 +111,18 @@ async function lineReplyDesign(source, message, targetUrl) {
         }
         else {
             const lastTime = await getLastCallingTime(role);
-            if (lastTime && (currentTime - lastTime) >= 60 * 60 * 1000) { // 超過 1小時保護
-                // 更新數據
-                lastIDCheck[role] = sourceId;
-                await updateLastCalling(role);
+            if (!lastTime || (currentTime - lastTime) >= 60 * 60 * 1000) {
+                // 【情況 B】超過一小時或無紀錄：更新為最新的 ID
+                lastIDCheck[role] = sourceId; 
+                await updateLastCalling(role); // 這裡面應該也要存入新的 sourceId
             }
-            // else {
-            //     // pass，使用上次的 ID，不進行新的更新
-            // }
+            else {
+                // 【情況 A】一小時內：維持原本的 ID 不變，避免頻繁更新
+                //  增加防呆，以免紀錄資訊不存在，那就強制更新一次吧
+                if (lastIDCheck[role] === null) {
+                    lastIDCheck[role] = sourceId; 
+                }
+            }
             results.text = `💡 受理: ${message.text}\n\n 🛠️ 這個聊天室的動態 ID 是: \n${lastIDCheck[role]}\n\n你可以把這個 ID 填到 Grafana 的 LINE 通知設定裡，這樣 Grafana 就知道要發通知到哪裡了！`;
         }
     }
