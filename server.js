@@ -107,7 +107,7 @@ app.post('/line', express.raw({ type: 'application/json' }), async (req, res) =>
 
         const result = await Promise.all(data.events.map(handleLineEvent));
 
-        if (result.every(r => r === null)) {
+        if (result === null || result.every(r => r === null)) {
             // 如果所有事件都沒有回覆訊息，直接回傳 200 OK，不需要回傳空陣列
             return res.sendStatus(200);
         }
